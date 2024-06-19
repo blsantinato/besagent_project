@@ -1,0 +1,76 @@
+---
+- name: Run a command to check if BesAgent is installed - Linux
+  ansible.builtin.shell: rpm -qa |grep -i besagent
+  register: besagent_check_linux
+  ignore_errors: true
+  when: ansible_distribution == 'RedHat'
+
+- name: Run a command to check if BesAgent is installed - AIX
+  ansible.builtin.shell: lslpp -l |grep -i besclient
+  register: besagent_check_aix
+  ignore_errors: true
+  when: ansible_system == 'AIX'
+
+- name: Touch a file
+  delegate_to: localhost
+  become: false
+  run_once: true
+  file:
+    path: "{{ playbook_dir }}/besagent_check_{{ ansible_date_time.date }}.csv"
+    state: touch
+#    owner: asrebrs1
+#    group: users
+    mode: '0644'
+
+- name: Create a Header on CSV
+  delegate_to: localhost
+  become: false
+  run_once: true
+  lineinfile:
+    dest: "{{ playbook_dir }}/besagent_check_{{ ansible_date_time.date }}.csv"
+    line: "{{ headers }}"
+ #   owner: asrebrs1
+ #   group: users
+    mode: '0644'
+
+- name: Populate a CSV file - Linux
+  delegate_to: localhost
+  become: false
+  lineinfile:
+    dest: "{{ playbook_dir }}/besagent_check_{{ ansible_date_time.date }}.csv"
+    line: "{{ inventory_hostname }},{{ 'Installed' if besagent_check_linux.rc == 0 else 'Not Installed' }}"
+#    owner: asrebrs1
+#    group: users
+    mode: '0644'
+  when: ansible_distribution == 'RedHat'
+
+- name: Populate a CSV file - AIX
+  delegate_to: localhost
+  become: false
+  lineinfile:
+    dest: "{{ playbook_dir }}/besagent_check_{{ ansible_date_time.date }}.csv"
+    line: "{{ inventory_hostname }},{{ 'Installed' if besagent_check_aix.rc == 0 else 'Not Installed' }}"
+#    owner: asrebrs1
+#    group: users
+    mode: '0644'
+  when: ansible_system == 'AIX' 
+
+- name: Send report thru mail
+  run_once: true
+  delegate_to: localhost
+  become: false
+  mail:
+    host: smtpav01.dal12v.mail.ibm.com
+    port: 25
+    subject: BesAgent Report Installed on Servers
+    to: "{{ email_address }}"
+    body: "See attached file besagent_check_{{ ansible_date_time.date }}.csv"
+    attach: "{{ playbook_dir }}/besagent_check_{{ ansible_date_time.date }}.csv"
+
+- name: Remove csv file from localhost
+  run_once: true
+  delegate_to: localhost
+  become: false
+  file: 
+    path: "{{ playbook_dir }}/besagent_check_{{ ansible_date_time.date }}.csv"
+    state: absent

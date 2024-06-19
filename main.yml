@@ -1,0 +1,16 @@
+---
+- name: BesAgent Report and Remove installation if needed
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    csv_filename: "{{ playbook_dir }}/besagent_check_{{ ansible_date_time.date }}.csv"
+    headers: Hostname,Status
+  roles:
+    - role: besagent_check
+      when: (option == 'besagent_check') and (ansible_system == 'AIX' or ansible_distribution == 'RedHat')
+      tags: besagent_check
+    
+    - role: besagent_remove
+      when: (option == 'besagent_remove') and (ansible_system == 'AIX' or ansible_distribution == 'RedHat')
+      tags: besagent_remove
